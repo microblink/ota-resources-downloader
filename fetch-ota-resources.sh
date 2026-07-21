@@ -110,6 +110,8 @@ jq '
       | .[1] as $entry
       | if ($entry.db_download_link | type) != "string" or ($entry.db_download_link | length) == 0 then
           error("OTA response is missing \($name).db_download_link")
+        elif ($entry.latest_version | type) != "string" or ($entry.latest_version | length) == 0 then
+          error("OTA response is missing \($name).latest_version")
         else
           $entry
           | filename as $filename
@@ -120,6 +122,7 @@ jq '
             else
               {
                 filename: $filename,
+                version: $entry.latest_version,
                 download_url: $entry.db_download_link
               }
             end
@@ -131,7 +134,7 @@ jq -r --arg output_dir "${output_dir}" \
   '.[] | [.download_url, ($output_dir + "/" + .filename)] | @tsv' \
   "${normalized_manifest_file}" >"${download_list_file}"
 
-jq '{ resources: map({ filename }) }' \
+jq '{ resources: map({ filename, version }) }' \
   "${normalized_manifest_file}" >"${resources_manifest_file}"
 
 while IFS=$'\t' read -r download_url destination; do
