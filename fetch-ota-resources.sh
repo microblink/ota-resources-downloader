@@ -78,8 +78,9 @@ mkdir -p "${output_dir}"
 manifest_file="$(mktemp)"
 normalized_manifest_file="$(mktemp)"
 download_list_file="$(mktemp)"
+resources_with_sizes_file="$(mktemp)"
 resources_manifest_file="${output_dir}/${MANIFEST_FILENAME}"
-trap 'rm -f "${manifest_file}" "${normalized_manifest_file}" "${download_list_file}"' EXIT
+trap 'rm -f "${manifest_file}" "${normalized_manifest_file}" "${download_list_file}" "${resources_with_sizes_file}"' EXIT
 
 echo "Resolving OTA resources for recognizer version: ${recognizer_version}"
 echo "Provider: ${provider_url}"
@@ -134,13 +135,23 @@ jq -r --arg output_dir "${output_dir}" \
   '.[] | [.download_url, ($output_dir + "/" + .filename)] | @tsv' \
   "${normalized_manifest_file}" >"${download_list_file}"
 
-jq '{ resources: map({ filename, version }) }' \
-  "${normalized_manifest_file}" >"${resources_manifest_file}"
-
 while IFS=$'\t' read -r download_url destination; do
   echo "Downloading $(basename "${destination}")"
   curl --fail --location --silent --show-error "${download_url}" --output "${destination}"
 done <"${download_list_file}"
+
+jq -r '.[] | [.filename, .version] | @tsv' "${normalized_manifest_file}" |
+  while IFS=$'\t' read -r filename version; do
+    content_length="$(wc -c <"${output_dir}/${filename}" | tr -d '[:space:]')"
+    jq -n \
+      --arg filename "${filename}" \
+      --arg version "${version}" \
+      --argjson contentLength "${content_length}" \
+      '{ filename: $filename, version: $version, contentLength: $contentLength }' \
+      >>"${resources_with_sizes_file}"
+  done
+
+jq -s '{ resources: . }' "${resources_with_sizes_file}" >"${resources_manifest_file}"
 
 echo "OTA resources manifest written to: ${resources_manifest_file}"
 echo "OTA resources written to: ${output_dir}"
