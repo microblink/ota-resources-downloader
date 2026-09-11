@@ -42,3 +42,17 @@ Use `./fetch-ota-resources.sh --help` for the complete command reference.
 
 The output directory contains the downloaded engine binaries and an
 `ota-resources.json` manifest. The default output directory is ignored by Git.
+
+Each manifest entry contains the downloaded file's byte length:
+
+```json
+{
+  "resources": [
+    {
+      "filename": "serialized-embedder-database.bin",
+      "version": "1.0.14",
+      "contentLength": 3831312
+    }
+  ]
+}
+```
